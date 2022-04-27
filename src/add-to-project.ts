@@ -126,7 +126,7 @@ export function getLabelOrAssignee(name: string): string[] {
 }
 
 // Ensure the issue matches our `labeled` or `assignee` filter based on the matching operator.
-export function filterForLabelOrAssignee(input: string[], operator: string, issue: any, issueInput: string[]): boolean {
+export function filterForLabelOrAssignee(input: string[], operator: string, issue: any, issueInput: string[]) {
   if (operator === 'and') {
     if (!input.every(l => issueInput.includes(l))) {
       core.info(`Skipping issue ${issue?.number} because it doesn't match all the ${Object.keys({input})[0]}s: ${input.join(', ')}`)
