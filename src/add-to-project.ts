@@ -43,12 +43,12 @@ export async function addToProject(): Promise<void> {
   const labelFilterValid = filterForLabelOrAssignee(labeled, labelOperator, issue, issueLabels)
   const assigneeFilterValid = filterForLabelOrAssignee(assignee, assigneeOperator, issue, issueAssignees)
   
-  core.info(`Labels: ${labeled.join(', ')}`)
-  core.info(`Assignees: ${assignee.join(', ')}`)
-  core.info(`Issue labels: ${issueLabels.join(', ')}`)
-  core.info(`Issue assignees: ${issueAssignees.join(', ')}`)
-  core.info(`Label filter valid: ${labelFilterValid}`)
-  core.info(`Assignee filter valid: ${assigneeFilterValid}`)
+  core.debug(`Labels: ${labeled.join(', ')}`)
+  core.debug(`Assignees: ${assignee.join(', ')}`)
+  core.debug(`Issue labels: ${issueLabels.join(', ')}`)
+  core.debug(`Issue assignees: ${issueAssignees.join(', ')}`)
+  core.debug(`Label filter valid: ${labelFilterValid}`)
+  core.debug(`Assignee filter valid: ${assigneeFilterValid}`)
   
   if (!labelFilterValid || !assigneeFilterValid) {
     return
