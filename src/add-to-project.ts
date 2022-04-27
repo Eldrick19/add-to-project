@@ -31,25 +31,19 @@ interface ProjectAddItemResponse {
 export async function addToProject(): Promise<void> {
   const projectUrl = core.getInput('project-url', {required: true})
   const ghToken = core.getInput('github-token', {required: true})
-  const labeled = getLabelOrAssignee('labeled')
-  const labelOperator = core.getInput('label-operator').trim().toLocaleLowerCase()
+  const labeled = getLabelOrAssignee('labeled'), assignee = getLabelOrAssignee('assignee')
+  const labelOperator = core.getInput('label-operator').trim().toLocaleLowerCase(), assigneeOperator = core.getInput('assignee-operator').trim().toLocaleLowerCase()
 
   const octokit = github.getOctokit(ghToken)
   const urlMatch = projectUrl.match(urlParse)
   const issue = github.context.payload.issue ?? github.context.payload.pull_request
-  const issueLabels: string[] = (issue?.labels ?? []).map((l: {name: string}) => l.name)
+  const issueLabels: string[] = (issue?.labels ?? []).map((l: {name: string}) => l.name), issueAssignees: string[] = (issue?.assignees ?? []).map((a: {login: string}) => a.login)
 
-  // Ensure the issue matches our `labeled` filter based on the label-operator.
-  if (labelOperator === 'and') {
-    if (!labeled.every(l => issueLabels.includes(l))) {
-      core.info(`Skipping issue ${issue?.number} because it doesn't match all the labels: ${labeled.join(', ')}`)
-      return
-    }
-  } else {
-    if (labeled.length > 0 && !issueLabels.some(l => labeled.includes(l))) {
-      core.info(`Skipping issue ${issue?.number} because it does not have one of the labels: ${labeled.join(', ')}`)
-      return
-    }
+  // Only proceed if filters are valid.
+  const labelFilterValid = filterForLabelOrAssignee(labeled, labelOperator, issue, issueLabels)
+  const assigneeFilterValid = filterForLabelOrAssignee(assignee, assigneeOperator, issue, issueAssignees)
+  if (!labelFilterValid || !assigneeFilterValid) {
+    return
   }
 
   core.debug(`Project URL: ${projectUrl}`)
@@ -129,4 +123,19 @@ export function getLabelOrAssignee(name: string): string[] {
       .map(l => l.trim())
       .filter(l => l.length > 0) ?? []
   return input
+}
+
+// Ensure the issue matches our `labeled` or `assignee` filter based on the matching operator.
+export function filterForLabelOrAssignee(input: string[], operator: string, issue: any, issueInput: string[]): boolean {
+  if (operator === 'and') {
+    if (!input.every(l => issueInput.includes(l))) {
+      core.info(`Skipping issue ${issue?.number} because it doesn't match all the ${Object.keys({input})[0]}s: ${input.join(', ')}`)
+      return false
+    }
+  } else {
+    if (input.length > 0 && !issueInput.some(l => input.includes(l))) {
+      core.info(`Skipping issue ${issue?.number} because it does not have one of the ${Object.keys({input})[0]}s: ${input.join(', ')}`)
+      return false
+    }
+  }
 }
