@@ -42,6 +42,14 @@ export async function addToProject(): Promise<void> {
   // Only proceed if filters are valid.
   const labelFilterValid = filterForLabelOrAssignee(labeled, labelOperator, issue, issueLabels)
   const assigneeFilterValid = filterForLabelOrAssignee(assignee, assigneeOperator, issue, issueAssignees)
+  
+  console.log(`Labels: ${labeled.join(', ')}`)
+  console.log(`Assignees: ${assignee.join(', ')}`)
+  console.log(`Issue labels: ${issueLabels.join(', ')}`)
+  console.log(`Issue assignees: ${issueAssignees.join(', ')}`)
+  console.log(`Label filter valid: ${labelFilterValid}`)
+  console.log(`Assignee filter valid: ${assigneeFilterValid}`)
+  
   if (!labelFilterValid || !assigneeFilterValid) {
     return
   }
