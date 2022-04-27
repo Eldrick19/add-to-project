@@ -31,12 +31,7 @@ interface ProjectAddItemResponse {
 export async function addToProject(): Promise<void> {
   const projectUrl = core.getInput('project-url', {required: true})
   const ghToken = core.getInput('github-token', {required: true})
-  const labeled =
-    core
-      .getInput('labeled')
-      .split(',')
-      .map(l => l.trim())
-      .filter(l => l.length > 0) ?? []
+  const labeled = getLabelOrAssignee('labeled')
   const labelOperator = core.getInput('label-operator').trim().toLocaleLowerCase()
 
   const octokit = github.getOctokit(ghToken)
@@ -123,4 +118,15 @@ export function mustGetOwnerTypeQuery(ownerType?: string): 'organization' | 'use
   }
 
   return ownerTypeQuery
+}
+
+// Get and clean input from workflow
+export function getLabelOrAssignee(name: string): string[] {
+  const input = 
+    core
+      .getInput(name)
+      .split(',')
+      .map(l => l.trim())
+      .filter(l => l.length > 0) ?? []
+  return input
 }
