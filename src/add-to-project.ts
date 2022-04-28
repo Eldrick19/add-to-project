@@ -31,7 +31,7 @@ interface ProjectAddItemResponse {
 export async function addToProject(): Promise<void> {
   const projectUrl = core.getInput('project-url', {required: true})
   const ghToken = core.getInput('github-token', {required: true})
-  const labeled = getLabelOrAssignee('labeled'), assignee = getLabelOrAssignee('assignee')
+  const labeled = getWorkflowInput('labeled'), assignee = getWorkflowInput('assignee')
   const labelOperator = core.getInput('label-operator').trim().toLocaleLowerCase(), assigneeOperator = core.getInput('assignee-operator').trim().toLocaleLowerCase()
 
   const octokit = github.getOctokit(ghToken)
@@ -40,19 +40,8 @@ export async function addToProject(): Promise<void> {
   const issueLabels: string[] = (issue?.labels ?? []).map((l: {name: string}) => l.name), issueAssignees: string[] = (issue?.assignees ?? []).map((a: {login: string}) => a.login)
 
   // Only proceed if filters are valid.
-  const labelFilterValid = filterForLabelOrAssignee(labeled, labelOperator, issue, issueLabels)
-  const assigneeFilterValid = filterForLabelOrAssignee(assignee, assigneeOperator, issue, issueAssignees)
-  
-  core.debug(`Labels: ${labeled.join(', ')}`)
-  core.debug(`Assignees: ${assignee.join(', ')}`)
-  core.debug(`Issue labels: ${issueLabels.join(', ')}`)
-  core.debug(`Issue assignees: ${issueAssignees.join(', ')}`)
-  core.debug(`Label filter valid: ${labelFilterValid}`)
-  core.debug(`Assignee filter valid: ${assigneeFilterValid}`)
-  
-  if (!labelFilterValid || !assigneeFilterValid) {
-    return
-  }
+  filterForWorkflowInput(labeled, labelOperator, issue, issueLabels)
+  filterForWorkflowInput(assignee, assigneeOperator, issue, issueAssignees)
 
   core.debug(`Project URL: ${projectUrl}`)
 
@@ -122,8 +111,8 @@ export function mustGetOwnerTypeQuery(ownerType?: string): 'organization' | 'use
   return ownerTypeQuery
 }
 
-// Get and clean input from workflow
-export function getLabelOrAssignee(name: string): string[] {
+// Get and clean input from workflow. This input is expected to be either a label or an assignee
+export function getWorkflowInput(name: string): string[] {
   const input = 
     core
       .getInput(name)
@@ -134,18 +123,16 @@ export function getLabelOrAssignee(name: string): string[] {
 }
 
 // Ensure the issue matches our `labeled` or `assignee` filter based on the matching operator.
-export function filterForLabelOrAssignee(input: string[], operator: string, issue: any, issueInput: string[]): boolean {
+export function filterForWorkflowInput(input: string[], operator: string, issue: any, issueInput: string[]) {
   if (operator === 'and') {
     if (!input.every(l => issueInput.includes(l))) {
       core.info(`Skipping issue ${issue?.number} because it doesn't match all the ${Object.keys({input})[0]}s: ${input.join(', ')}`)
-      return false
+      return
     }
   } else {
     if (input.length > 0 && !issueInput.some(l => input.includes(l))) {
       core.info(`Skipping issue ${issue?.number} because it does not have one of the ${Object.keys({input})[0]}s: ${input.join(', ')}`)
-      return false
+      return
     }
   }
-
-  return true
 }
