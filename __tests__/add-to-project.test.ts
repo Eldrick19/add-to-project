@@ -154,7 +154,70 @@ describe('addToProject', () => {
     const infoSpy = jest.spyOn(core, 'info')
     const gqlMock = mockGraphQL()
     await addToProject()
-    expect(infoSpy).toHaveBeenCalledWith(`Skipping issue 1 because it does not have one of the labels: bug`)
+    expect(infoSpy).toHaveBeenCalledWith(`Skipping issue 1 because it doesn't match one of the fields from "labeled": bug`)
+    expect(gqlMock).not.toHaveBeenCalled()
+  })
+
+  test('adds matching pull-requests with a assignee filter without assignee-operator', async () => {
+    mockGetInput({
+      'project-url': 'https://github.com/orgs/github/projects/1',
+      'github-token': 'gh_token',
+      assignee: 'monalisa, jon'
+    })
+
+    github.context.payload = {
+      pull_request: {
+        number: 1,
+        assignees: [{login: 'jon'}]
+      }
+    }
+
+    mockGraphQL(
+      {
+        test: /getProject/,
+        return: {
+          organization: {
+            projectNext: {
+              id: 'project-next-id'
+            }
+          }
+        }
+      },
+      {
+        test: /addProjectNextItem/,
+        return: {
+          addProjectNextItem: {
+            projectNextItem: {
+              id: 'project-next-item-id'
+            }
+          }
+        }
+      }
+    )
+
+    await addToProject()
+
+    expect(outputs.itemId).toEqual('project-next-item-id')
+  })
+
+  test('does not add un-matching issues with a label filter without label-operator', async () => {
+    mockGetInput({
+      'project-url': 'https://github.com/orgs/github/projects/1',
+      'github-token': 'gh_token',
+      labeled: 'bug'
+    })
+
+    github.context.payload = {
+      issue: {
+        number: 1,
+        labels: []
+      }
+    }
+
+    const infoSpy = jest.spyOn(core, 'info')
+    const gqlMock = mockGraphQL()
+    await addToProject()
+    expect(infoSpy).toHaveBeenCalledWith(`Skipping issue 1 because it doesn't match one of the fields from "labeled": bug`)
     expect(gqlMock).not.toHaveBeenCalled()
   })
 
@@ -212,14 +275,14 @@ describe('addToProject', () => {
     github.context.payload = {
       issue: {
         number: 1,
-        labels: [{name: 'bug'}, {name: 'other'}]
+        labels: [{name: 'or'}, {name: 'other'}]
       }
     }
 
     const infoSpy = jest.spyOn(core, 'info')
     const gqlMock = mockGraphQL()
     await addToProject()
-    expect(infoSpy).toHaveBeenCalledWith(`Skipping issue 1 because it doesn't match all the labels: bug, new`)
+    expect(infoSpy).toHaveBeenCalledWith(`Skipping issue 1 because it doesn't match all the fields from "labeled": bug, new`)
     expect(gqlMock).not.toHaveBeenCalled()
   })
 
@@ -287,9 +350,83 @@ describe('addToProject', () => {
     const gqlMock = mockGraphQL()
     await addToProject()
     expect(infoSpy).toHaveBeenCalledWith(
-      `Skipping issue 1 because it does not have one of the labels: accessibility, backend, bug`
+      `Skipping issue 1 because it doesn't match one of the fields from "labeled": accessibility, backend, bug`
     )
     expect(gqlMock).not.toHaveBeenCalled()
+  })
+
+  test('adds matching issues when assignee and labels are set as filters', async () => {
+    mockGetInput({
+      'project-url': 'https://github.com/orgs/github/projects/1',
+      'github-token': 'gh_token',
+      labeled: 'accessibility, backend, bug',
+      assignee: 'monalisa, octocat',
+      'assignee-operator': 'AND'
+    })
+
+    github.context.payload = {
+      issue: {
+        number: 1,
+        labels: [{name: 'accessibility'}, {name: 'frontend'}, {name: 'improvement'}],
+        assignees: [{login: 'monalisa'}, {login: 'octocat'}]
+      }
+    }
+
+    const gqlMock = mockGraphQL(
+      {
+        test: /getProject/,
+        return: {
+          organization: {
+            projectNext: {
+              id: 'project-next-id'
+            }
+          }
+        }
+      },
+      {
+        test: /addProjectNextItem/,
+        return: {
+          addProjectNextItem: {
+            projectNextItem: {
+              id: 'project-next-item-id'
+            }
+          }
+        }
+      }
+    )
+
+    const infoSpy = jest.spyOn(core, 'info')
+    await addToProject()
+    expect(infoSpy).not.toHaveBeenCalled()
+    expect(gqlMock).toHaveBeenCalled()
+    expect(outputs.itemId).toEqual('project-next-item-id')
+  })
+
+  test('does not add un-matching issues when assignee and labels are set as filters', async () => {
+    mockGetInput({
+      'project-url': 'https://github.com/orgs/github/projects/1',
+      'github-token': 'gh_token',
+      labeled: 'accessibility, backend, bug',
+      assignee: 'monalisa, octocat',
+      'assignee-operator': 'AND'
+    })
+
+    github.context.payload = {
+      issue: {
+        number: 1,
+        labels: [{name: 'accessibility'}, {name: 'frontend'}, {name: 'improvement'}],
+        assignees: [{login: 'monalisa'}, {login: 'jon'}]
+      }
+    }
+
+    const infoSpy = jest.spyOn(core, 'info')
+    const gqlMock = mockGraphQL()
+    await addToProject()
+    expect(infoSpy).toHaveBeenCalledWith(
+      `Skipping issue 1 because it doesn't match all the fields from "assignee": monalisa, octocat`
+    )
+    expect(gqlMock).not.toHaveBeenCalled()
+
   })
 
   test('handles spaces and extra commas gracefully in label filter input', async () => {
@@ -493,6 +630,7 @@ describe('mustGetOwnerTypeQuery', () => {
     }).toThrow(`Unsupported ownerType: unknown. Must be one of 'orgs' or 'users'`)
   })
 })
+
 
 function mockGetInput(mocks: Record<string, string>): jest.SpyInstance {
   const mock = (key: string) => mocks[key] ?? ''
