@@ -1,5 +1,8 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
+import { Interface } from 'readline'
+import { DefaultDeserializer } from 'v8'
+import { IssueOrPRComponent, WorkflowComponent } from './component'
 
 // TODO: Ensure this (and the Octokit client) works for non-github.com URLs, as well.
 // https://github.com/orgs|users/<ownerName>/projects/<projectNumber>
@@ -31,32 +34,26 @@ interface ProjectAddItemResponse {
 export async function addToProject(): Promise<void> {
   const projectUrl = core.getInput('project-url', {required: true})
   const ghToken = core.getInput('github-token', {required: true})
-  const labeled =
-    core
-      .getInput('labeled')
-      .split(',')
-      .map(l => l.trim())
-      .filter(l => l.length > 0) ?? []
-  const labelOperator = core.getInput('label-operator').trim().toLocaleLowerCase()
 
   const octokit = github.getOctokit(ghToken)
   const urlMatch = projectUrl.match(urlParse)
   const issue = github.context.payload.issue ?? github.context.payload.pull_request
-  const issueLabels: string[] = (issue?.labels ?? []).map((l: {name: string}) => l.name)
 
-  // Ensure the issue matches our `labeled` filter based on the label-operator.
-  if (labelOperator === 'and') {
-    if (!labeled.every(l => issueLabels.includes(l))) {
-      core.info(`Skipping issue ${issue?.number} because it doesn't match all the labels: ${labeled.join(', ')}`)
-      return
-    }
-  } else {
-    if (labeled.length > 0 && !issueLabels.some(l => labeled.includes(l))) {
-      core.info(`Skipping issue ${issue?.number} because it does not have one of the labels: ${labeled.join(', ')}`)
-      return
-    }
-  }
+  // Set up workflow component objects.
+  const workflowAssignee = new WorkflowComponent('assignee')
+  const workflowLabels = new WorkflowComponent('labeled')
+  workflowAssignee.operator = core.getInput('assignee-operator').trim().toLocaleLowerCase()
+  workflowLabels.operator = core.getInput('label-operator').trim().toLocaleLowerCase()
 
+  // Set up issue/PR component objects.
+  const assignee = new IssueOrPRComponent('assignee')
+  const labels = new IssueOrPRComponent('labels')
+  assignee.values = (issue?.assignees ?? []).map((a: {login: string}) => a.login)
+  labels.values = (issue?.labels ?? []).map((l: {name: string}) => l.name)
+
+  // Only proceed if the workflow assignee and labels match the issue/PR assignee and labels.
+  if(!workflowAssignee.matches(assignee) || !workflowLabels.matches(labels)) { return }
+  
   core.debug(`Project URL: ${projectUrl}`)
 
   if (!urlMatch) {

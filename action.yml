@@ -16,6 +16,13 @@ inputs:
   label-operator:
     required: false
     description: The behavior of the labels filter, AND to match all labels, OR to match any label (default is OR)
+  assignee:
+    required: false
+    description: A comma-separated list of assignees to use as a filter for issue to be added
+  assignee-operator:
+    required: false
+    description: The behavior of the assignee filter, AND to match all assignees, OR to match any assignee (default is OR)
+
 runs:
   using: 'node16'
   main: 'dist/index.js'
